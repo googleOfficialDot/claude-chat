@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Chat</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:700px;margin:0 auto;padding:16px;display:flex;flex-direction:column;height:100vh;box-sizing:border-box}
+  #log{flex:1;overflow-y:auto;border:1px solid #ccc;border-radius:8px;padding:12px;margin-bottom:8px}
+  .msg{margin:8px 0;padding:8px 12px;border-radius:8px;white-space:pre-wrap}
+  .user{background:#e8f0fe;text-align:right}
+  .bot{background:#f3f3f3}
+  #row{display:flex;gap:8px}
+  #input{flex:1;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:16px}
+  button{padding:10px 18px;border:0;border-radius:8px;background:#c96442;color:#fff;font-size:16px;cursor:pointer}
+  button:disabled{opacity:.5}
+  #info{font-size:12px;color:#666;margin-top:6px}
+</style>
+</head>
+<body>
+<h2>AI Chat</h2>
+<div id="log"></div>
+<div id="row">
+  <input id="input" placeholder="Type message..." autocomplete="off">
+  <button id="send">Send</button>
+</div>
+<div id="info"></div>
+
+<script>
+const WORKER_URL = "PASTE_WORKER_URL_HERE";
+const log = document.getElementById("log");
+const input = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+const info = document.getElementById("info");
+let history = [];
+
+function add(role, text){
+  const d = document.createElement("div");
+  d.className = "msg " + (role === "user" ? "user" : "bot");
+  d.textContent = text;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function send(){
+  const text = input.value.trim();
+  if(!text) return;
+  input.value = "";
+  add("user", text);
+  history.push({role:"user", content:text});
+  sendBtn.disabled = true;
+  try{
+    const res = await fetch(WORKER_URL, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({messages: history})
+    });
+    const data = await res.json();
+    if(!res.ok){
+      add("bot", "Error: " + (data.error || res.status));
+      history.pop();
+    } else {
+      add("bot", data.reply);
+      history.push({role:"assistant", content:data.reply});
+      info.textContent = `Tokens used today: ${data.used} / ${data.limit}`;
+    }
+  }catch(e){
+    add("bot", "Network error.");
+    history.pop();
+  }
+  sendBtn.disabled = false;
+  input.focus();
+}
+
+sendBtn.onclick = send;
+input.addEventListener("keydown", e => { if(e.key === "Enter") send(); });
+</script>
+</body>
+</html>
